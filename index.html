@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8"/>
+        <link rel="stylesheet" href="./assets/css/style.css"/>
+        <script type="text/javascript" src="./assets/js/Meter.js"></script>
+        <script type="text/javascript" src="./assets/js/Step.js"></script>
+        <script type="text/javascript" src="./assets/js/Fake.js"></script>
+        <script type="text/javascript">
+
+var fake = null;
+var step = null;
+
+window.addEventListener("load", ev => {
+    const rpm = Meter.from("circles", {
+        title: "RPM",
+        value_cleaner: x => (x/1000).toFixed(1),
+        value_max: 8000,
+    }).render();
+    
+    const kmph = Meter.from("circles", {
+        title: "KMPH",
+        value_max: 160,
+        percentColor: Meter.percentBlueRed,
+    }).render();
+    
+    step = Step.fromFrance();
+    const container = document.getElementById("speed_limit");
+    
+    const kmph_update = x => {
+        const level = step.update(x).getLevel();
+        
+        container.innerHTML = level;
+        
+        return kmph.step(x);
+    }
+    
+    const options = [
+        { callback: x=>rpm.step(x)
+        , min: 700
+        , delta: 1000
+        , max: 8000
+        },
+        { callback: x=>kmph_update(x)
+        , min: 0
+        , delta: 20
+        , max: 220
+        },
+    ];
+    
+    fake = Fake.from(options).start(88);
+});
+
+        </script>
+    </head>
+    <body>
+        <div id="speed_limit"></div>
+        <div id="circles"></div>
+    </body>
+</html>
