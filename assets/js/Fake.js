@@ -25,16 +25,17 @@ class FakeRotor {
     
     make() {
         const delta = this.options.delta;
-        const diff = (Math.random() * delta) - (delta / 2);
+        const rand = Math.pow(Math.random()-0.5, 3);
+        const diff = rand * delta;
         
         this.step = 1 + Math.round(Math.random() * 20);
         
         let target = this.value + diff;
         
         if (this.options.max < target) {
-            target = target - this.options.max;
+            target = this.value - diff;
         } else if (target < this.options.min) {
-            target = this.options.min - target;
+            target = this.value - diff;
         }
         
         this.delta = (target - this.value) / this.step;
@@ -117,5 +118,9 @@ class Fake {
         }
         
         return this;
+    }
+    
+    restart(ms) {
+        return this.stop().start(ms);
     }
 }

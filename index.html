@@ -4,6 +4,7 @@
         <meta charset="UTF-8"/>
         <link rel="stylesheet" href="./assets/css/style.css"/>
         <script type="text/javascript" src="./assets/js/Meter.js"></script>
+        <script type="text/javascript" src="./assets/js/Strip.js"></script>
         <script type="text/javascript" src="./assets/js/Step.js"></script>
         <script type="text/javascript" src="./assets/js/Fake.js"></script>
         <script type="text/javascript">
@@ -12,36 +13,58 @@ var fake = null;
 var step = null;
 
 window.addEventListener("load", ev => {
-    const rpm = Meter.from("circles", {
+    step = Step.fromFrance();
+    const container = document.getElementById("speed_limit");
+    
+    // =======
+    
+    const rpm_m = Meter.from("meters", {
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    const kmph = Meter.from("circles", {
+    const kmph_m = Meter.from("meters", {
         title: "KMPH",
         value_max: 160,
         percentColor: Meter.percentBlueRed,
     }).render();
     
-    step = Step.fromFrance();
-    const container = document.getElementById("speed_limit");
+    // =======
     
-    const kmph_update = x => {
+    const rpm_s = Strip.from("strips", {
+        title: "RPM",
+        value_cleaner: x => (x/1000).toFixed(1),
+        value_max: 8000,
+    }).render();
+    
+    const kmph_s = Strip.from("strips", {
+        title: "KMPH",
+        value_max: 160,
+    }).render();
+    
+    // =======
+    
+    const rpm_cb = x => {
+        rpm_m.step(x);
+        rpm_s.step(x);
+    }
+    
+    const kmph_cb = x => {
+        kmph_m.step(x);
+        kmph_s.step(x);
+        
         const level = step.update(x).getLevel();
-        
         container.innerHTML = level;
-        
-        return kmph.step(x);
     }
     
     const options = [
-        { callback: x=>rpm.step(x)
+        { callback: rpm_cb
         , min: 700
         , delta: 1000
         , max: 8000
         },
-        { callback: x=>kmph_update(x)
+        { callback: kmph_cb
         , min: 0
         , delta: 20
         , max: 220
@@ -55,6 +78,7 @@ window.addEventListener("load", ev => {
     </head>
     <body>
         <div id="speed_limit"></div>
-        <div id="circles"></div>
+        <div id="meters"></div>
+        <div id="strips"></div>
     </body>
 </html>
