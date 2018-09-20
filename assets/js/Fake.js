@@ -9,38 +9,39 @@ class FakeRotor {
         
         this.options = Object.assign(defaults, options || {});
         
-        //console.log(this.options);
-        
         this.delta = 0;
         this.step = 0;
         this.value = null===this.options.default
             ? this.options.min
             : this.options.default
             ;
+        this.target = this.value;
+        this.frequency = 1;
     }
     
     static from(options) {
         return new this(options);
     }
+
+    setDelta(value) {
+        if (this.target < this.value) {
+            this.delta = -value / this.frequency;
+        } else {
+            this.delta = value / this.frequency;
+        }
+
+        return this;
+    }
     
     make() {
-        const delta = this.options.delta;
-        const rand = Math.pow(Math.random()-0.5, 3);
-        const diff = rand * delta;
-        
-        this.step = 1 + Math.round(Math.random() * 20);
-        
-        let target = this.value + diff;
-        
-        if (this.options.max < target) {
-            target = this.value - diff;
-        } else if (target < this.options.min) {
-            target = this.value - diff;
-        }
-        
-        this.delta = (target - this.value) / this.step;
-        
-        //console.log(this.value, target, this.delta, this.step);
+        const offset = this.options.max - this.options.min;
+        const rand = Math.pow(Math.random(), 3);
+        const delta = Math.random() * this.options.delta;
+
+        this.target = this.options.min + rand * offset;
+        this.step = 1 + Math.round(Math.random() * 100);
+                
+        this.setDelta(delta);
         
         return this;
     }
@@ -49,9 +50,18 @@ class FakeRotor {
         if (0 > --this.step) {
             this.make();
         }
-        
-        this.value += this.delta;
-        this.value = Math.max(this.options.min, Math.min(this.value, this.options.max));
+
+        let delta = (this.target - this.value) /2;
+
+        if (Math.abs(delta) < Math.abs(this.delta)) {
+            this.setDelta(delta);
+        }
+
+        this.value += delta /100;
+
+        if (this.delta < this.options.delta/10) {
+            this.step = Math.round(this.step / 4);
+        }
         
         return this.value;
     }
@@ -59,7 +69,7 @@ class FakeRotor {
 
 class Fake {
     constructor() {
-        this.timer = null;
+        this.pid = null;
         this.fakes = [];
     }
     
@@ -104,17 +114,21 @@ class Fake {
     }
     
     start(ms) {
-        if (null===this.timer) {
-            this.timer = window.setInterval(()=>this.step(), ms);
+        if (null === this.pid) {
+            this.pid = window.setInterval(()=>this.step(), ms);
+
+            this.fakes.forEach(f => {
+                f.frequency = 500 / ms;
+            });
         }
         
         return this;
     }
     
     stop() {
-        if (null!==this.timer) {
-            window.clearInterval(this.timer);
-            this.timer = null;
+        if (null !== this.pid) {
+            window.clearInterval(this.pid);
+            this.pid = null;
         }
         
         return this;

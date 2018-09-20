@@ -1,12 +1,11 @@
 class Meter {
-    constructor(parentId, options) {
+    constructor(parentId, sensor, options) {
         const defaults = {
             title: null,
             title_margin: 10,
             value_cleaner: null,
             value_min: 0,
             value_max: 100,
-            buffer_size: 128,
             background_margin: 20,
             background_margin_mark: 14,
             background_lineWidth: 5,
@@ -29,21 +28,30 @@ class Meter {
             percentColor: Meter.percentGreenRed,
         };
         
+        this.sensor = sensor;
         this.options = Object.assign(defaults, options);
         
-        this.values = [ this.options.value_min ];
-        this.buffer = [ this.options.value_min ];
-        this.history = [];
         this.colors = [];
+        this.stats = {avg:this.options.value_min};
         
         this.parentId = parentId;
         this.node = document.createElement('canvas');
         this.ctx = this.node.getContext('2d');
         this.background = null;
+
+        this.width = null;
+        this.height = null;
+        this.hand_x = null;
+        this.hand_y = null;
+        this.hand_radius = null;
+        this.history_x = null;
+        this.history_y = null;
+        this.history_width = null;
+        this.history_height = null;
     }
     
-    static from(parentId, options) {
-        return new this(parentId, options);
+    static from(parentId, sensor, options) {
+        return new this(parentId, sensor, options);
     }
     
     static boundNumber(min, x, max) {
@@ -91,47 +99,21 @@ class Meter {
         
         this.node.width = width;
         this.node.height = height;
+
+        this.width = width;
+        this.height = height;
+        this.hand_x = Math.round(width/2);
+        this.hand_y = Math.round(height/2);
+        this.hand_radius = Math.round(Math.max(width, height) /2);
+        this.history_x = this.hand_x;
+        this.history_y = this.hand_y;
+        this.history_width = width - this.history_x;
+        this.history_height = height - this.history_y;
+
+        this.sensor.options.buffer_size = this.hand_radius;
+        this.sensor.options.history_size = this.history_width;
         
         return this;
-    }
-    
-    bufferize(entry) {
-        const buffer_size = this.options.buffer_size;
-        
-        this.buffer.push(entry);
-        
-        if (buffer_size === this.buffer.length) {
-            const ref = this.buffer[0];
-            const stat = {
-                count: 0,
-                sum: ref,
-                min: ref,
-                max: ref,
-                avg: null,
-            };
-            
-            for (let i=1; i<buffer_size; ++i) {
-                const item = this.buffer[i];
-                stat.sum += item;
-                if (stat.min > item) {
-                    stat.min = item;
-                }
-                if (stat.max < item) {
-                    stat.max = item;
-                }
-            }
-            
-            stat.count = buffer_size;
-            stat.avg = Math.round(stat.sum / stat.count);
-            
-            this.buffer.splice(0);
-            
-            this.history.unshift(stat);
-            
-            return true;
-        }
-        
-        return false;
     }
     
     getAnchors() {
@@ -153,33 +135,26 @@ class Meter {
     }
     
     makeBackground() {
-        const width = this.node.width;
-        const height = this.node.height;
-        const center_x = Math.round(width/2);
-        const center_y = Math.round(height/2);
         const circle_size = this.options.circle_size;
         const value_max = this.options.value_max;
         const margin = this.options.title_margin;
         const anchors = this.getAnchors();
         
-        this.ctx.clearRect(0, 0, width, height);
+        this.ctx.clearRect(0, 0, this.width, this.height);
         
         this.ctx.fillStyle = this.options.background_fill;
         this.ctx.globalAlpha = this.options.background_opacity;
         
         this.ctx.beginPath();
-        this.ctx.arc(center_x, center_y, width/2, 0, 2* Math.PI);
-        this.ctx.moveTo(center_x, center_y);
-        this.ctx.lineTo(width, center_y);
-        this.ctx.lineTo(width, height);
-        this.ctx.lineTo(center_x, height);
+        this.ctx.arc(this.hand_x, this.hand_y, this.hand_radius, 0, 2* Math.PI);
+        this.ctx.rect(this.history_x, this.history_y, this.history_width, this.history_height);
         this.ctx.fill();
         
         this.ctx.font = this.options.background_font;
         this.ctx.fillStyle = this.options.background_fill;
         this.ctx.textAlign = "left";
         this.ctx.textBaseline = "bottom";
-        this.ctx.fillText(this.options.title, center_x +margin, height -margin);
+        this.ctx.fillText(this.options.title, this.hand_x +margin, this.height -margin);
         
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
@@ -190,8 +165,8 @@ class Meter {
             const teta = circle_size * percent;
             const teta_sin = -Math.sin(teta);
             const teta_cos = Math.cos(teta);
-            const teta_x = teta_sin * width/2;
-            const teta_y = teta_cos * height/2;
+            const teta_x = teta_sin * this.hand_radius;
+            const teta_y = teta_cos * this.hand_radius;
             
             let offset;
             let length;
@@ -222,14 +197,14 @@ class Meter {
             const y1 = y0 - teta_cos * offset;
             
             this.ctx.beginPath();
-            this.ctx.moveTo(center_x + x0, center_y + y0);
-            this.ctx.lineTo(center_x + x, center_y + y);
+            this.ctx.moveTo(this.hand_x + x0, this.hand_y + y0);
+            this.ctx.lineTo(this.hand_x + x, this.hand_y + y);
             this.ctx.stroke();
             
-            this.ctx.fillText(value, center_x + x1, center_y + y1);
+            this.ctx.fillText(value, this.hand_x + x1, this.hand_y + y1);
         });
         
-        this.background = this.ctx.getImageData(0, 0, width, height);
+        this.background = this.ctx.getImageData(0, 0, this.width, this.height);
         
         return this;
     }
@@ -239,52 +214,44 @@ class Meter {
     }
     
     backgroundAnimation(color) {
-        const buffer_size = this.options.buffer_size;
+        const liveList = this.sensor.getLiveList();
+        const size = liveList.length;
         const circle_size = this.options.circle_size;
         const value_max = this.options.value_max;
-        const size = this.values.length;
-        const width = this.node.width;
-        const height = this.node.height;
-        const center_x = Math.round(width/2);
-        const center_y = Math.round(height/2);
         
         this.ctx.lineWidth = 1;
         
         for (let i=1; i<size; ++i) {
-            const r = Meter.boundNumber(this.options.value_min, this.values[i], this.options.value_max);
+            const value = liveList[i];
+            const r = Meter.boundNumber(this.options.value_min, value, this.options.value_max);
             const percent = r / value_max;
             const teta = circle_size * percent;
-            const teta_x = Math.sin(teta) * (-width/2);
-            const teta_y = Math.cos(teta) * (height/2);
+            const teta_x = -Math.sin(teta) * this.hand_radius;
+            const teta_y = Math.cos(teta) * this.hand_radius;
             
-            const coeffMin = 0.25* (buffer_size-i)/buffer_size;
-            const coeffMax = Math.max(0, buffer_size-i-8)/buffer_size;
+            const coeff = (size-i)/size;
+            const coeffMin = 0.25 * coeff;
             
-            const x = teta_x *coeffMax;
-            const y = teta_y *coeffMax;
+            const x = teta_x *coeff;
+            const y = teta_y *coeff;
             
             const x0 = teta_x *coeffMin;
             const y0 = teta_y *coeffMin;
             
             this.ctx.globalAlpha = coeffMin;
             this.ctx.strokeStyle = this.getColor(1-percent);
+
             this.ctx.beginPath();
-            this.ctx.moveTo(center_x + x0, center_y + y0);
-            this.ctx.lineTo(center_x + x, center_y + y);
+            this.ctx.moveTo(this.hand_x + x0, this.hand_y + y0);
+            this.ctx.lineTo(this.hand_x + x, this.hand_y + y);
             this.ctx.stroke();
         }
-        
-        this.values.splice(buffer_size);
         
         return this;
     }
     
     titleAnimation(color) {
-        const ref = this.values[0];
-        const width = this.node.width;
-        const height = this.node.height;
-        const center_x = Math.round(width/2);
-        const center_y = Math.round(height/2);
+        const ref = this.sensor.getValue() || this.options.value_min;
         const margin = this.options.title_margin;
         
         const value = null === this.options.value_cleaner
@@ -299,56 +266,66 @@ class Meter {
         this.ctx.fillStyle = this.options.foreground_fill;
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "bottom";
-        this.ctx.strokeText(value, center_x, center_y -margin);
-        this.ctx.fillText(value, center_x, center_y -margin);
+
+        this.ctx.strokeText(value, this.hand_x, this.hand_y -margin);
+        this.ctx.fillText(value, this.hand_x, this.hand_y -margin);
         
         return this;
     }
     
     handAnimation(color) {
-        const ref = Meter.boundNumber(this.options.value_min, this.values[0], this.options.value_max);
+        const ref = this.sensor.getValue() || this.options.value_min;
+        const ref0 = Meter.boundNumber(this.options.value_min, ref, this.options.value_max);
         const circle_size = this.options.circle_size;
         const value_max = this.options.value_max;
-        const width = this.node.width;
-        const height = this.node.height;
-        const center_x = Math.round(width/2);
-        const center_y = Math.round(height/2);
-        const percent = ref / value_max;
+        const percent = ref0 / value_max;
         const lineWidth = Math.ceil(this.options.background_lineWidth * 2 * percent);
         
         const teta = circle_size * percent;
         const teta_x = -Math.sin(teta);
         const teta_y = Math.cos(teta);
         
-        let x = teta_x * width;
-        let y = teta_y * height;
+        let x = teta_x * this.hand_radius;
+        let y = teta_y * this.hand_radius;
         
-        if (teta < 3*Math.PI/2) {
-            x/= 2;
-            y/= 2;
+        if (teta > 3*Math.PI/2) {
+            x *= 2;
+            y *= 2;
         }
         
+        this.ctx.globalAlpha = 1;
         this.ctx.strokeStyle = this.options.hand_color;
         this.ctx.fillStyle = this.options.hand_color;
         this.ctx.lineWidth = this.options.hand_lineWidth;
         
-        // draw hand
-        this.ctx.beginPath();
-        this.ctx.arc(center_x, center_y, 2, 0, 2* Math.PI, false);
-        this.ctx.fill();
-        
         // draw hand center
         this.ctx.beginPath();
-        this.ctx.moveTo(center_x, center_y);
-        this.ctx.lineTo(center_x + x, center_y + y);
-        this.ctx.stroke();
+        this.ctx.arc(this.hand_x, this.hand_y, 2, 0, 2* Math.PI, false);
+        this.ctx.fill();
         
+        // draw hand line
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.hand_x, this.hand_y);
+        this.ctx.lineTo(this.hand_x + x, this.hand_y + y);
+        this.ctx.stroke();
+
         // draw boundaries
         this.ctx.lineWidth = lineWidth;
-        this.ctx.strokeStyle = color;
+
+        if (Math.PI/2 + (percent*circle_size) < 2* Math.PI) {
+            this.ctx.strokeStyle = color;
+            this.ctx.beginPath();
+            this.ctx.arc(this.hand_x, this.hand_y, this.hand_radius-(lineWidth/2), Math.PI/2 + (percent*circle_size), 2* Math.PI, false);
+            this.ctx.stroke();
+        }
+
+        this.ctx.strokeStyle = this.options.hand_color;
         this.ctx.beginPath();
-        this.ctx.arc(center_x, center_y, (width-lineWidth)/2, 2, 2* Math.PI, false);
+        this.ctx.arc(this.hand_x, this.hand_y, this.hand_radius-(lineWidth/2), Math.PI/2, Math.PI/2 + (percent*circle_size), false);
         this.ctx.stroke();
+        //this.ctx.beginPath();
+        //this.ctx.arc(this.hand_x, this.hand_y, (this.hand_radius-lineWidth)*0.8, Math.PI/2, Math.PI/2 + (percent*circle_size), false);
+        //this.ctx.stroke();
         
         return this;
     }
@@ -356,15 +333,8 @@ class Meter {
     historyAnimation() {
         const value_max = this.options.value_max;
         const line_width = 1;
-        const width = this.node.width;
-        const height = this.node.height;
-        const center_x = Math.round(width/2);
-        const center_y = Math.round(height/2);
-        const history_width = width/2;
-        const history_height = height/2;
-        const w = center_x + history_width;
-        const h = center_y + history_height;
-        const grad = this.ctx.createLinearGradient(0, center_y, 0, h);
+        const history = this.sensor.getHistoryList();
+        const grad = this.ctx.createLinearGradient(0, this.history_y, 0, this.history_y + this.history_height);
         
         grad.addColorStop(0, "red");
         grad.addColorStop(0.5, "yellow");
@@ -376,40 +346,36 @@ class Meter {
         this.ctx.fillStyle = "yellow";
         this.ctx.lineWidth = line_width;
         
-        this.history.forEach((r, i) => {
-            const x = w -1 - line_width*i;
-            const coeff = history_height / value_max;
-            const yMax = h - Math.floor(r.max * coeff);
-            const y = h - Math.floor(r.avg * coeff);
-            const yMin = h - Math.floor(r.min * coeff);
+        history.forEach((r, i) => {
+            const x = this.history_width -1 - line_width*i;
+            const coeff = this.history_height / value_max;
+            const yMax = this.history_height - Math.floor(r.max * coeff);
+            const y = this.history_height - Math.floor(r.avg * coeff);
+            const yMin = this.history_height - Math.floor(r.min * coeff);
             
             this.ctx.beginPath();
-            this.ctx.moveTo(x, yMin);
-            this.ctx.lineTo(x, yMax);
+            this.ctx.moveTo(this.history_x + x, this.history_y + yMin);
+            this.ctx.lineTo(this.history_x + x, this.history_y + yMax);
             this.ctx.stroke();
             
-            this.ctx.fillRect(x, y, 1, 1);
+            this.ctx.fillRect(this.history_x + x, this.history_y + y, 1, 1);
         });
-        
-        this.history.splice(Math.round(history_width/line_width));
         
         return this;
     }
     
     updateAnimation() {
-        const ref = this.values[0];
+        const ref = this.sensor.value || this.options.value_min;
         const value_max = this.options.value_max;
         const color = this.getColor(1-(ref/value_max));
         
-        //this.clearAnimation(color);
         this.restoreBackground();
         this.backgroundAnimation(color);
-        
         this.historyAnimation();
         this.titleAnimation(color);
         this.handAnimation(color);
         
-        //window.requestAnimationFrame(rpmHistoryAnimation);
+        window.requestAnimationFrame(()=>this.updateAnimation());
         
         return this;
     }
@@ -417,6 +383,7 @@ class Meter {
     render() {
         if (null === this.background) {
             document.getElementById(this.parentId).appendChild(this.node);
+
             this.generateColors(this.options.percentColor);
         }
         
@@ -425,11 +392,5 @@ class Meter {
         this.updateAnimation();
         
         return this;
-    }
-    
-    step(value) {
-        this.values.unshift(value);
-        this.updateAnimation();
-        this.bufferize(value);
     }
 }

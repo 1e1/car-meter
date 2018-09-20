@@ -3,6 +3,7 @@
     <head>
         <meta charset="UTF-8"/>
         <link rel="stylesheet" href="./assets/css/style.css"/>
+        <script type="text/javascript" src="./assets/js/Sensor.js"></script>
         <script type="text/javascript" src="./assets/js/Meter.js"></script>
         <script type="text/javascript" src="./assets/js/Strip.js"></script>
         <script type="text/javascript" src="./assets/js/Step.js"></script>
@@ -15,16 +16,21 @@ var step = null;
 window.addEventListener("load", ev => {
     step = Step.fromFrance();
     const container = document.getElementById("speed_limit");
-    
+
+    // =======
+
+    const rpm_sensor = Sensor.from();
+    const kmph_sensor = Sensor.from();
+
     // =======
     
-    const rpm_m = Meter.from("meters", {
+    const rpm_m = Meter.from("meters", rpm_sensor, {
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    const kmph_m = Meter.from("meters", {
+    const kmph_m = Meter.from("meters", kmph_sensor, {
         title: "KMPH",
         value_max: 160,
         percentColor: Meter.percentBlueRed,
@@ -32,46 +38,40 @@ window.addEventListener("load", ev => {
     
     // =======
     
-    const rpm_s = Strip.from("strips", {
+    const rpm_s = Strip.from("strips", rpm_sensor, {
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    const kmph_s = Strip.from("strips", {
+    const kmph_s = Strip.from("strips", kmph_sensor, {
         title: "KMPH",
         value_max: 160,
     }).render();
     
     // =======
     
-    const rpm_cb = x => {
-        rpm_m.step(x);
-        rpm_s.step(x);
-    }
-    
     const kmph_cb = x => {
-        kmph_m.step(x);
-        kmph_s.step(x);
+        kmph_sensor.setValue(x);
         
         const level = step.update(x).getLevel();
         container.innerHTML = level;
     }
     
     const options = [
-        { callback: rpm_cb
+        { callback: (x)=>rpm_sensor.setValue(x)
         , min: 700
-        , delta: 1000
+        , delta: 200
         , max: 8000
         },
         { callback: kmph_cb
         , min: 0
-        , delta: 20
+        , delta: 5
         , max: 220
         },
     ];
     
-    fake = Fake.from(options).start(88);
+    fake = Fake.from(options).start(100);
 });
 
         </script>
