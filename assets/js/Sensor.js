@@ -35,7 +35,7 @@ class Sensor {
     static from(options) {
         const sensor = new Sensor(options);
 
-        return sensor.start();
+        return sensor;
     }
 
     constructor(options) {
@@ -43,20 +43,27 @@ class Sensor {
             buffer_size: 128,
             history_size: 512,
             live_interval_ms: 100,
+            base: 1,
         };
         
         this.pid = null;
         this.options = Object.assign(defaults, options || {});
         
+        this.reset();
+    }
+
+    reset() {
         this.value = null;
         this.values = [];
         this.live = [];
         this.historyBuffer = [];
         this.history = [];
+
+        return this;
     }
 
     setValue(value) {
-        this.values.unshift(value);
+        this.values.unshift(value / this.options.base);
 
         return this;
     }
@@ -81,6 +88,12 @@ class Sensor {
 
     getLiveList() {
         return this.live;
+    }
+
+    getLiveAt(ms) {
+        const index = Math.floor(ms / this.options.live_interval_ms);
+
+        return this.live[index];
     }
 
     getHistoryList() {
@@ -127,10 +140,12 @@ class Sensor {
     }
     
     start(ms) {
-        const interval = ms || this.options.live_interval_ms;
+        if (0 < ms) {
+            this.options.live_interval_ms = ms;
+        }
         
         if (null === this.pid) {
-            this.pid = window.setInterval(()=>this.update(), interval);
+            this.pid = window.setInterval(()=>this.update(), this.options.live_interval_ms);
         }
         
         return this;

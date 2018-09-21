@@ -5,7 +5,8 @@
         <link rel="stylesheet" href="./assets/css/style.css"/>
         <script type="text/javascript" src="./assets/js/Sensor.js"></script>
         <script type="text/javascript" src="./assets/js/Meter.js"></script>
-        <script type="text/javascript" src="./assets/js/Strip.js"></script>
+        <script type="text/javascript" src="./assets/js/VStrip.js"></script>
+        <script type="text/javascript" src="./assets/js/HStrip.js"></script>
         <script type="text/javascript" src="./assets/js/Step.js"></script>
         <script type="text/javascript" src="./assets/js/Fake.js"></script>
         <script type="text/javascript">
@@ -19,18 +20,18 @@ window.addEventListener("load", ev => {
 
     // =======
 
-    const rpm_sensor = Sensor.from();
-    const kmph_sensor = Sensor.from();
+    const rpm_sensor = Sensor.from().start();
+    const kmph_sensor = Sensor.from().start();
 
     // =======
     
-    const rpm_m = Meter.from("meters", rpm_sensor, {
+    Meter.from("meters", rpm_sensor, {
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    const kmph_m = Meter.from("meters", kmph_sensor, {
+    Meter.from("meters", kmph_sensor, {
         title: "KMPH",
         value_max: 160,
         percentColor: Meter.percentBlueRed,
@@ -38,15 +39,30 @@ window.addEventListener("load", ev => {
     
     // =======
     
-    const rpm_s = Strip.from("strips", rpm_sensor, {
+    VStrip.from("strips", rpm_sensor, {
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    const kmph_s = Strip.from("strips", kmph_sensor, {
+    VStrip.from("strips", kmph_sensor, {
         title: "KMPH",
         value_max: 160,
+        percentColor: VStrip.percentBlueRed,
+    }).render();
+    
+    // =======
+    
+    HStrip.from("squares", rpm_sensor, {
+        title: "RPM",
+        value_cleaner: x => (x/1000).toFixed(1),
+        value_max: 8000,
+    }).render();
+    
+    HStrip.from("squares", kmph_sensor, {
+        title: "KMPH",
+        value_max: 160,
+        percentColor: HStrip.percentBlueRed,
     }).render();
     
     // =======
@@ -80,5 +96,6 @@ window.addEventListener("load", ev => {
         <div id="speed_limit"></div>
         <div id="meters"></div>
         <div id="strips"></div>
+        <div id="squares"></div>
     </body>
 </html>
