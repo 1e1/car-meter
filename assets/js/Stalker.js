@@ -1,4 +1,4 @@
-class Step {
+class Stalker {
     constructor(steps, options) {
         this.index = -1;
         this.since = -1;
@@ -124,7 +124,7 @@ class Step {
         return i+1;
     }
     
-    update(value) {
+    async update(value) {
         const index = this.findIndex(value);
         
         if (this.index !== index) {

@@ -3,8 +3,9 @@ Math.PImul2 = Math.PI * 2;
 
 
 class Meter {
-    constructor(parentId, sensor, options) {
+    constructor(sensor, options) {
         const defaults = {
+            parentNode: document.body,
             title: null,
             title_margin: 10,
             value_cleaner: null,
@@ -29,6 +30,7 @@ class Meter {
             foreground_fill: "white",
             foreground_stroke: "black",
             foreground_font: "64px mono",
+            alert_font: "48px mono",
             circle_size: 0.8 * Math.PImul2,
             percentColor: Meter.percentGreenRed,
         };
@@ -38,24 +40,26 @@ class Meter {
         
         this.colors = [];
         
-        this.parentId = parentId;
         this.node = document.createElement('canvas');
         this.ctx = this.node.getContext('2d');
         this.background = null;
 
         this.width = null;
         this.height = null;
+        this.title_x = null;
+        this.title_y = null;
         this.hand_x = null;
         this.hand_y = null;
         this.hand_radius = null;
+        this.alert_radius = null;
         this.history_x = null;
         this.history_y = null;
         this.history_width = null;
         this.history_height = null;
     }
     
-    static from(parentId, sensor, options) {
-        return new this(parentId, sensor, options);
+    static from(sensor, options) {
+        return new this(sensor, options);
     }
     
     static percentGreenRed(x) {
@@ -108,9 +112,12 @@ class Meter {
 
         this.width = width;
         this.height = height;
+        this.title_x = width >> 1;
+        this.title_y = height >> 2;
         this.hand_x = width >> 1; // Math.round(width/2);
         this.hand_y = height >> 1; // Math.round(height/2);
         this.hand_radius = Math.max(width, height) >> 1; //Math.round(Math.max(width, height) /2);
+        this.alert_radius = Math.max(width, height) >> 3;
         this.history_x = this.hand_x;
         this.history_y = this.hand_y;
         this.history_width = width - this.history_x;
@@ -232,6 +239,7 @@ class Meter {
             const teta_y = Math.cos(teta) * this.hand_radius;
             
             const coeff = (size-i)/size;
+            //const k = 1.5*coeff - 0.5;
             
             const x = teta_x *coeff;
             const y = teta_y *coeff;
@@ -240,6 +248,7 @@ class Meter {
             const y0 = y *0.75;
             
             this.ctx.globalAlpha = coeff;
+            //this.ctx.lineWidth = Math.round(1/coeff);
             this.ctx.strokeStyle = this.getColor(value);
 
             this.ctx.beginPath();
@@ -254,7 +263,6 @@ class Meter {
     titleAnimation(color) {
         const value = this.sensor.getValue();
         const value_max = this.options.value_max;
-        const margin = this.options.title_margin;
         const ref = value * value_max;
         
         const title = null === this.options.value_cleaner
@@ -268,12 +276,46 @@ class Meter {
         this.ctx.strokeStyle = this.options.foreground_stroke;
         this.ctx.fillStyle = this.options.foreground_fill;
         this.ctx.textAlign = "center";
-        this.ctx.textBaseline = "bottom";
+        this.ctx.textBaseline = "middle";
 
-        this.ctx.strokeText(title, this.hand_x, this.hand_y -margin);
-        this.ctx.fillText(title, this.hand_x, this.hand_y -margin);
+        this.ctx.strokeText(title, this.title_x, this.title_y);
+        this.ctx.fillText(title, this.title_x, this.title_y);
         
         return this;
+    }
+
+    alertAnimation(color) {
+        const limit = this.sensor.getOverflow();
+        const margin = this.options.title_margin;
+        const value = this.sensor.getValue();
+        const value_max = this.options.value_max;
+        const ref = value * value_max;
+
+        //console.log(limit);
+        if (null !== limit) {
+            if (limit < ref) {
+                this.ctx.fillStyle = "red";
+
+                this.ctx.beginPath();
+                this.ctx.arc(this.hand_x, this.hand_y, this.alert_radius, 0, Math.PImul2); // TODO
+                this.ctx.fill();
+
+                this.ctx.fillStyle = "white";
+            } else {
+                this.ctx.fillStyle = color;
+            }
+
+            this.ctx.beginPath();
+            this.ctx.arc(this.hand_x, this.hand_y, this.alert_radius - margin, 0, Math.PImul2); // TODO
+            this.ctx.fill();
+
+            this.ctx.font = this.options.alert_font;
+            this.ctx.fillStyle = "black";
+            this.ctx.textAlign = "center";
+            this.ctx.textBaseline = "middle";
+
+            this.ctx.fillText(limit, this.hand_x, this.hand_y+4);
+        }
     }
 
     ghostAnimation(color) {
@@ -350,7 +392,7 @@ class Meter {
         this.ctx.lineWidth = line_width;
         
         history.forEach((r, i) => {
-            const color = this.getColor(1-(r.avg/value_max));
+            const color = this.getColor(r.avg);
             const x = this.history_width -1 - line_width*i;
             const yMax = this.history_height - Math.floor(r.max * this.history_height);
             const y = this.history_height - Math.floor(r.avg * this.history_height);
@@ -379,6 +421,7 @@ class Meter {
         //this.ghostAnimation(color);
         this.titleAnimation(color);
         this.handAnimation(color);
+        this.alertAnimation(color);
         
         window.requestAnimationFrame(()=>this.updateAnimation());
         
@@ -386,11 +429,10 @@ class Meter {
     }
     
     render() {
-        this.sensor.options.base = this.options.value_max;
         this.sensor.reset();
 
         if (null === this.background) {
-            document.getElementById(this.parentId).appendChild(this.node);
+            this.options.parentNode.appendChild(this.node);
 
             this.generateColors(this.options.percentColor);
         }

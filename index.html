@@ -7,7 +7,7 @@
         <script type="text/javascript" src="./assets/js/Meter.js"></script>
         <script type="text/javascript" src="./assets/js/VStrip.js"></script>
         <script type="text/javascript" src="./assets/js/HStrip.js"></script>
-        <script type="text/javascript" src="./assets/js/Step.js"></script>
+        <script type="text/javascript" src="./assets/js/Stalker.js"></script>
         <script type="text/javascript" src="./assets/js/Fake.js"></script>
         <script type="text/javascript">
 
@@ -15,51 +15,66 @@ var fake = null;
 var step = null;
 
 window.addEventListener("load", ev => {
-    step = Step.fromFrance();
-    const container = document.getElementById("speed_limit");
-
+    step = Stalker.fromFrance({type:"notime"});
+    
     // =======
 
     const rpm_sensor = Sensor.from().start();
     const kmph_sensor = Sensor.from().start();
 
+    kmph_sensor.getOverflow = () => {
+        const value_max = 160;
+        const percent = kmph_sensor.getValue();
+        const value = percent * value_max;
+
+        step.update(value);
+        
+        return step.getLevel();
+    };
+    
     // =======
     
-    Meter.from("meters", rpm_sensor, {
+    Meter.from(rpm_sensor, {
+        parentNode: document.getElementById("meters"),
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    Meter.from("meters", kmph_sensor, {
+    Meter.from(kmph_sensor, {
+        parentNode: document.getElementById("meters"),
         title: "KMPH",
         value_max: 160,
         percentColor: Meter.percentBlueRed,
     }).render();
     
     // =======
-    
-    VStrip.from("strips", rpm_sensor, {
+
+    VStrip.from(rpm_sensor, {
+        parentNode: document.getElementById("strips"),
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    VStrip.from("strips", kmph_sensor, {
+    VStrip.from(kmph_sensor, {
+        parentNode: document.getElementById("strips"),
         title: "KMPH",
         value_max: 160,
         percentColor: VStrip.percentBlueRed,
     }).render();
     
     // =======
-    
-    HStrip.from("squares", rpm_sensor, {
+
+    HStrip.from(rpm_sensor, {
+        parentNode: document.getElementById("squares"),
         title: "RPM",
         value_cleaner: x => (x/1000).toFixed(1),
         value_max: 8000,
     }).render();
     
-    HStrip.from("squares", kmph_sensor, {
+    HStrip.from(kmph_sensor, {
+        parentNode: document.getElementById("squares"),
         title: "KMPH",
         value_max: 160,
         percentColor: HStrip.percentBlueRed,
@@ -67,20 +82,13 @@ window.addEventListener("load", ev => {
     
     // =======
     
-    const kmph_cb = x => {
-        kmph_sensor.setValue(x);
-        
-        const level = step.update(x).getLevel();
-        container.innerHTML = level;
-    }
-    
     const options = [
-        { callback: (x)=>rpm_sensor.setValue(x)
+        { callback: (x, max)=>rpm_sensor.setValue(x/max)
         , min: 700
         , delta: 200
         , max: 8000
         },
-        { callback: kmph_cb
+        { callback: (x, max)=>kmph_sensor.setValue(x/max)
         , min: 0
         , delta: 5
         , max: 220
@@ -93,7 +101,6 @@ window.addEventListener("load", ev => {
         </script>
     </head>
     <body>
-        <div id="speed_limit"></div>
         <div id="meters"></div>
         <div id="strips"></div>
         <div id="squares"></div>

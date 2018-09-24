@@ -1,6 +1,7 @@
 class HStrip {
-    constructor(parentId, sensor, options) {
+    constructor(sensor, options) {
         const defaults = {
+            parentNode: document.body,
             title: null,
             title_margin: 10,
             value_cleaner: Math.round,
@@ -31,7 +32,6 @@ class HStrip {
         
         this.colors = [];
 
-        this.parentId = parentId;
         this.node = document.createElement('canvas');
         this.ctx = this.node.getContext('2d');
         this.background = null;
@@ -50,8 +50,8 @@ class HStrip {
         this.title_y = null;
     }
     
-    static from(parentId, sensor, options) {
-        return new this(parentId, sensor, options);
+    static from(sensor, options) {
+        return new this(sensor, options);
     }
     
     static percentGreenRed(x) {
@@ -255,7 +255,7 @@ class HStrip {
         
         this.ctx.fillStyle = color;
         
-        this.ctx.fillRect(this.hand_x, this.hand_y, this.hand_x + x, this.hand_y + this.hand_height);
+        this.ctx.fillRect(this.hand_x, this.hand_y, x, this.hand_height);
         
         return this;
     }
@@ -298,7 +298,7 @@ class HStrip {
 
         //this.clearAnimation();
         this.restoreBackground();
-        this.backgroundAnimation(color);
+        //this.backgroundAnimation(color);
         this.historyAnimation();
         this.titleAnimation(color);
         this.handAnimation(color);
@@ -309,11 +309,10 @@ class HStrip {
     }
     
     render() {
-        this.sensor.options.base = this.options.value_max;
         this.sensor.reset();
 
         if (null === this.background) {
-            document.getElementById(this.parentId).appendChild(this.node);
+            this.options.parentNode.appendChild(this.node);
 
             this.generateColors(this.options.percentColor);
         }

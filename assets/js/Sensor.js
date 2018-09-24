@@ -1,9 +1,5 @@
 class Sensor {
-    static boundNumber(min, x, max) {
-        return Math.min(max, Math.max(x, min));
-    }
-
-    static getStats(list) {
+    static async getStats(list) {
         const size = list.length;
         const ref = list[0];
         const stat = {
@@ -78,6 +74,18 @@ class Sensor {
         return this;
     }
 
+    getOverflow() {
+        if (this.value < 0) {
+            return this.value;
+        }
+
+        if (1 < this.value) {
+            return this.value;
+        }
+
+        return null;
+    }
+
     getValue() {
         if (0 === this.values.length) {
             return this.value;
@@ -90,10 +98,21 @@ class Sensor {
         return this.live;
     }
 
+    getLiveIndexAt(ms) {
+        return Math.floor(ms / this.options.live_interval_ms);
+    }
+
     getLiveAt(ms) {
-        const index = Math.floor(ms / this.options.live_interval_ms);
+        const index = this.getLiveIndexAt(ms);
 
         return this.live[index];
+    }
+
+    async getLiveStatFor(ms) {
+        const index = this.getLiveIndexAt(ms);
+        const list = this.live.slice(0, index);
+
+        return await Sensor.getStats(list);
     }
 
     getHistoryList() {
@@ -106,18 +125,18 @@ class Sensor {
         return this;
     }
 
-    updateLive(value) {
+    async updateLive(value) {
         this.live.unshift(value);
         this.live.splice(this.options.buffer_size);
 
         return this;
     }
 
-    updateHistory(value) {
+    async updateHistory(value) {
         this.historyBuffer.unshift(value);
 
         if (this.historyBuffer.length === this.options.buffer_size) {
-            const stat = Sensor.getStats(this.historyBuffer);
+            const stat = await Sensor.getStats(this.historyBuffer);
             
             this.historyBuffer.splice(0);
 
@@ -128,13 +147,13 @@ class Sensor {
         return this;
     }
 
-    update() {
+    async update() {
         const value = this.makeValue().value;
         
         this.resetValues();
 
-        this.updateLive(value);
-        this.updateHistory(value);
+        await this.updateLive(value);
+        await this.updateHistory(value);
     
         return this;
     }

@@ -1,6 +1,7 @@
 class VStrip {
-    constructor(parentId, sensor, options) {
+    constructor(sensor, options) {
         const defaults = {
+            parentNode: document.body,
             title: null,
             title_margin: 10,
             value_cleaner: Math.round,
@@ -31,7 +32,6 @@ class VStrip {
         
         this.colors = [];
 
-        this.parentId = parentId;
         this.node = document.createElement('canvas');
         this.ctx = this.node.getContext('2d');
         this.background = null;
@@ -52,8 +52,8 @@ class VStrip {
         this.title_height = null;
     }
     
-    static from(parentId, sensor, options) {
-        return new this(parentId, sensor, options);
+    static from(sensor, options) {
+        return new this(sensor, options);
     }
     
     static percentGreenRed(x) {
@@ -106,9 +106,10 @@ class VStrip {
         
         this.setTitleContext();
 
+        const margin = this.options.title_margin;
         const char3 = this.ctx.measureText("888");
-        const panelWidth = (width - char3.width) >> 1;
-
+        const panelWidth = (width - margin - char3.width - margin) >> 1;
+        
         this.width = width;
         this.height = height;
         this.history_x = 0;
@@ -122,7 +123,7 @@ class VStrip {
         this.title_x = this.hand_x + this.hand_width;
         this.title_y = height >> 1;
         this.title_width = width - this.title_x;
-        this.title_height = char3.height;
+        this.title_height = height;
 
         this.sensor.options.buffer_size = this.hand_width;
         this.sensor.options.history_size = this.history_width;
@@ -239,24 +240,42 @@ class VStrip {
     
     setTitleContext() {
         this.ctx.lineWidth = 2;
-        this.ctx.globalAlpha = 1;
         this.ctx.font = this.options.foreground_font;
-        this.ctx.strokeStyle = this.options.foreground_stroke;
-        this.ctx.fillStyle = this.options.foreground_fill;
-        this.ctx.textAlign = "right";
-        this.ctx.textBaseline = "middle";
         
         return this;
     }
     
     titleAnimation(color) {
+        const limit = this.sensor.getOverflow();
         const value = this.sensor.getValue();
         const value_max = this.options.value_max;
+        const ref = value * value_max;
         const margin = this.options.title_margin;
-        const title = this.options.value_cleaner(value * value_max);
+        const title = this.options.value_cleaner(ref);
+
+        this.ctx.globalAlpha = 1;
+        this.ctx.fillStyle = this.options.foreground_fill;
+        this.ctx.strokeStyle = this.options.foreground_stroke;
+
+        if (null !== limit) {
+            this.ctx.font = this.options.background_font;
+            this.ctx.textAlign = "right";
+            this.ctx.textBaseline = "bottom";
+            
+            this.ctx.strokeText(limit, this.width - margin, this.height - margin);
+            this.ctx.fillText(limit, this.width - margin, this.height - margin);
+
+            this.ctx.fillStyle = limit < ref 
+                ? "red"
+                : color
+                ;
+        }
         
         this.setTitleContext();
-        
+
+        this.ctx.textAlign = "right";
+        this.ctx.textBaseline = "middle";
+
         this.ctx.strokeText(title, this.title_x + this.title_width -margin, this.title_y);
         this.ctx.fillText(title, this.title_x + this.title_width -margin, this.title_y);
         
@@ -264,8 +283,14 @@ class VStrip {
     }
     
     handAnimation(color) {
+        const length = this.options.background_lineLength;
         const value = this.sensor.getValue();
         const y = Math.round(this.hand_height * (1-value));
+        
+        this.ctx.fillStyle = color;
+        
+        // draw amount
+        //this.ctx.fillRect(this.title_x -length, this.hand_y + y, length, this.hand_height - y);
         
         this.ctx.fillStyle = this.options.hand_color;
         this.ctx.lineWidth = this.options.hand_lineWidth;
@@ -342,11 +367,10 @@ class VStrip {
     }
     
     render() {
-        this.sensor.options.base = this.options.value_max;
         this.sensor.reset();
 
         if (null === this.background) {
-            document.getElementById(this.parentId).appendChild(this.node);
+            this.options.parentNode.appendChild(this.node);
 
             this.generateColors(this.options.percentColor);
         }

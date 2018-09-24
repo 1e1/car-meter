@@ -97,7 +97,7 @@ class Fake {
         
         const fake = {
             engine: FakeRotor.from(options),
-            callback: defaults.callback,
+            callback: options.callback,
         }
         
         this.fakes.push(fake);
@@ -106,8 +106,9 @@ class Fake {
     step() {
         this.fakes.forEach(fake => {
             const value = fake.engine.get();
+            const options = fake.engine.options;
             
-            fake.callback(value);
+            fake.callback(value, options.max, options.min);
         });
         
         return this;
@@ -115,11 +116,11 @@ class Fake {
     
     start(ms) {
         if (null === this.pid) {
-            this.pid = window.setInterval(()=>this.step(), ms);
-
             this.fakes.forEach(f => {
                 f.frequency = 500 / ms;
             });
+
+            this.pid = window.setInterval(()=>this.step(), ms);
         }
         
         return this;
