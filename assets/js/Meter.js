@@ -26,6 +26,7 @@ class Meter {
             anchor_lineWidth_mark: 4,
             hand_color: "red",
             hand_lineWidth: 3,
+            hand_segmentWidth: 1,
             foreground_opacity: 1,
             foreground_fill: "white",
             foreground_stroke: "black",
@@ -224,37 +225,44 @@ class Meter {
     restoreBackground() {
         this.ctx.putImageData(this.background, 0, 0);
     }
+
+    getHandPosition(value, coeff) {
+        const circle_size = this.options.circle_size;
+
+        const teta = circle_size * value;
+        const teta_x = -Math.sin(teta) * this.hand_radius;
+        const teta_y = Math.cos(teta) * this.hand_radius;
+
+        return {
+            x: teta_x *coeff,
+            y: teta_y *coeff,
+            teta: teta,
+        }
+    }
     
     backgroundAnimation(color) {
         const liveList = this.sensor.getLiveList();
         const size = liveList.length;
-        const circle_size = this.options.circle_size;
+        const reverseSize = 1/size;
         
-        this.ctx.lineWidth = 1;
+        this.ctx.lineWidth = this.options.hand_segmentWidth;
+
+        let position0 = this.getHandPosition(liveList[0], 1);
         
-        for (let i=1; i<size; ++i) {
+        for (let i=1; i<size; i++) {
             const value = liveList[i];
-            const teta = circle_size * value;
-            const teta_x = -Math.sin(teta) * this.hand_radius;
-            const teta_y = Math.cos(teta) * this.hand_radius;
-            
-            const coeff = (size-i)/size;
-            //const k = 1.5*coeff - 0.5;
-            
-            const x = teta_x *coeff;
-            const y = teta_y *coeff;
-            
-            const x0 = x *0.75;
-            const y0 = y *0.75;
+            const coeff = (size-i) * reverseSize;
+            const position = this.getHandPosition(value, coeff);
             
             this.ctx.globalAlpha = coeff;
-            //this.ctx.lineWidth = Math.round(1/coeff);
             this.ctx.strokeStyle = this.getColor(value);
 
             this.ctx.beginPath();
-            this.ctx.moveTo(this.hand_x + x0, this.hand_y + y0);
-            this.ctx.lineTo(this.hand_x + x, this.hand_y + y);
+            this.ctx.moveTo(this.hand_x + position0.x, this.hand_y + position0.y);
+            this.ctx.lineTo(this.hand_x + position.x, this.hand_y + position.y);
             this.ctx.stroke();
+
+            position0 = position;
         }
         
         return this;
@@ -348,18 +356,11 @@ class Meter {
     
     handAnimation(color) {
         const value = this.sensor.getValue();
-        const circle_size = this.options.circle_size;
+        const position = this.getHandPosition(value, 1);
         
-        const teta = circle_size * value;
-        const teta_x = -Math.sin(teta);
-        const teta_y = Math.cos(teta);
-        
-        let x = teta_x * this.hand_radius;
-        let y = teta_y * this.hand_radius;
-        
-        if (teta > 3* Math.PIdiv2) {
-            x *= 2;
-            y *= 2;
+        if (position.teta > 3* Math.PIdiv2) {
+            position.x *= 2;
+            position.y *= 2;
         }
         
         this.ctx.globalAlpha = 1;
@@ -375,7 +376,7 @@ class Meter {
         // draw hand line
         this.ctx.beginPath();
         this.ctx.moveTo(this.hand_x, this.hand_y);
-        this.ctx.lineTo(this.hand_x + x, this.hand_y + y);
+        this.ctx.lineTo(this.hand_x + position.x, this.hand_y + position.y);
         this.ctx.stroke();
         
         return this;
