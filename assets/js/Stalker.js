@@ -119,7 +119,7 @@ class Stalker {
         
         do {
             // nothing
-        } while (value < this.steps[--i]);
+        } while (value <= this.steps[--i]);
         
         return i+1;
     }
